@@ -1,0 +1,96 @@
+---
+title: "Manatee Deaths by Registered Boats"
+author: "Karen Gaither"
+date: "October 5, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(ggfortify)
+library(GGally)
+```
+
+Manatees are large, gentle sea creatures that live along the Florida coast. The number of manatees killed by motorboats in the state of Florida has continually been monitored since 1974 by the Florida Fish and Wildlife Conservation Commission. The number of motor boats registered within the state since 1977 is available from the state's Department of Motor Vehicle. The original data are attribued to Elementary Statistics 9th edition by Mario Triola but have since been updated.
+
+```{r}
+manatees <- read.csv("manatee.csv")
+manatee.fit <- lm(ManateesKilled ~ BoatsRegistered, data=manatees)
+autoplot(manatee.fit)
+```
+
+* Nothing concerning about linearity from the line in Residuals vs Fitted plot
+* No clear pattern in the residuals in the Residuals vs Fitted or Scale-Location plots
+* Normality looks good from the QQ-Plot
+
+```{r}
+summary(manatee.fit)
+```
+
+* The number of boats registered is a sigificant predictor for the number of manatees killed ($F$-stat of 291.2 on 1 and 38 degrees of freedom, or the $t$-stat of 17.064, both with a $p$-value of near 0)
+* The model including the number of boats registered explains about 88\% of the variability in the number of manatees killed per year.
+
+```{r}
+manatees <- manatees %>%
+  mutate(Fitted = fitted(manatee.fit))
+ggplot(manatees) + 
+  geom_point(aes(x=BoatsRegistered, y=ManateesKilled) ) +
+  geom_line(aes(x=BoatsRegistered, y=Fitted), color="royalblue") + 
+  labs(x="Boats Registered (100s)", y="Manatees killed by motorboats") + 
+  theme_bw()
+```
+
+### Confidence Interval
+
+```{r}
+confint(manatee.fit)
+```
+
+* With 95\% confidence, 100 more boats registered (1 unit), will result in approximately 0.1168 to 0.1483 manatees killed. To phrase another way, for every 10,000 boats registered (100 units), you can be confident that between approximately 11.7 to 14.8 manatees would be killed.
+
+Confidence bands can be created from confidence intervals for every data point.
+
+```{r}
+manatees <- manatees %>%
+  mutate(Lower.CI = predict(manatee.fit, interval="conf")[,2],
+         Upper.CI = predict(manatee.fit, interval="conf")[,3])
+ggplot(manatees) + 
+  geom_point(aes(x=BoatsRegistered, y=ManateesKilled) ) +
+  geom_line(aes(x=BoatsRegistered, y=Fitted), color="royalblue") + 
+  geom_line(aes(x=BoatsRegistered, y=Lower.CI), color="red") + 
+  geom_line(aes(x=BoatsRegistered, y=Upper.CI), color="red") + 
+  labs(x="Boats Registered (100s)", y="Manatees killed by motorboats") + 
+  theme_bw()
+```
+
+
+### Prediction Bands
+
+We can use the predict() function to test the model for points that are not in the dataset. For example if there are 790 hundred (79,000) boats registered. 
+
+```{r}
+predict(manatee.fit, newdata=data.frame(BoatsRegistered=790), interval="pred")
+```
+We predict, with 95% confidence, that between 42.338 and 79.962 manatees (i.e. 42 to 80) will be killed when 79,000 boats are registered.
+
+
+This can be repeated for all points to build a prediction band.
+
+```{r}
+manatees <- manatees %>%
+  mutate(Lower.PI = predict(manatee.fit, interval="pred")[,2],
+         Upper.PI = predict(manatee.fit, interval="pred")[,3])
+```
+
+```{r}
+ggplot(data=manatees) + 
+  geom_ribbon(aes(x=BoatsRegistered, ymin=Lower.PI, ymax=Upper.PI), fill="gray80") + 
+  geom_ribbon(aes(x=BoatsRegistered, ymin=Lower.CI, ymax=Upper.CI), fill="gray60") + 
+  geom_point(aes(x=BoatsRegistered, y=ManateesKilled) ) +
+  geom_line(aes(x=BoatsRegistered, y=Fitted), color="royalblue") + 
+  labs(x="Boats Registered (100s)", y="Manatees killed by motorboats") + 
+  theme_bw()
+```
+
